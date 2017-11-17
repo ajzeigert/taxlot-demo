@@ -1,2 +1,6 @@
+taxlots_joined/taxlots_joined.dbf filter=lfs diff=lfs merge=lfs -text
+Taxlots/Taxlots.dbf filter=lfs diff=lfs merge=lfs -text
+Taxlots/Taxlots.shp filter=lfs diff=lfs merge=lfs -text
+taxlots_joined/taxlots_joined.shp filter=lfs diff=lfs merge=lfs -text
 *.dbf filter=lfs diff=lfs merge=lfs -text
 *.shp filter=lfs diff=lfs merge=lfs -text

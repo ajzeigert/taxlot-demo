@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title></title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+	<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.23.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.23.0/mapbox-gl.css' rel='stylesheet' />
+	<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+	<link rel="stylesheet" type="text/css" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v0.11.15/mapbox-gl-draw.css" />
+	<script type="text/javascript" src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v0.11.15/mapbox-gl-draw.js"></script>
+
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+
+		#features {
+	        position: absolute;
+	        top: 0;
+	        right: 10px;
+			padding: 10px;
+			text-align: left;
+	        overflow: auto;
+	        background: rgba(255, 255, 255, 0.8);
+    }
+
+
+    </style>
+</head>
+<body>
+
+<div id='map'></div>
+<pre id='features'></pre>
+
+<!--	<pre id='featuresWindow'></pre>-->
+<script>
+	mapboxgl.accessToken = 'pk.eyJ1Ijoic21hcnRtaW5lIiwiYSI6Imt6TUp0cEEifQ.9MrwD6GRlEGj9OTNN-bsRw';
+
+	var smartmineTaxlots = 'mapbox://smartmine.5tf8jd3t'; // Vector tile service
+
+	var deschutesTaxlots = 'http://data.deschutes.org/datasets/28019431cced49849cb4b1793b075bf1_2.geojson' // GeoJSON service
+
+	var filteredTaxlots = 'http://data.deschutes.org/datasets/28019431cced49849cb4b1793b075bf1_2.geojson?where=&geometry={"xmin":-13899661.02123182,"ymin":5374273.299645319,"xmax":-13028278.898780854,"ymax":5557722.167529733,"spatialReference":{"wkid":102100}}'
+
+	// var deschutesSales = 'http://data.deschutes.org/datasets/0e5089bd9f814b798ed26c077c24f6c7_9.geojson'; // GeoJSON service
+
+	var deschutesSalesQuery = "https://maps.deschutes.org/arcgis/rest/services/OpenData/TablesFD/MapServer/9/" // Map service URL
+
+	// Basic check for GL support
+	if ( !mapboxgl.supported() ) {
+		alert('Your browser does not support Mapbox GL');
+		// Should add a regular leaflet map here just in case
+	} else {
+
+		var map = new mapboxgl.Map({
+				container: 'map', // container id
+				style: 'mapbox://styles/smartmine/cigdv27lk00029hkt6leqc9yz', //stylesheet location
+				center: [-121.3, 44.05], // starting position
+				zoom: 11, // starting zoom
+				minzoom: 11,
+				hash: true
+		});
+
+		map.on('style.load', function() {
+			map.addSource('terrain-data', {
+				type: 'vector',
+				url: 'mapbox://mapbox.mapbox-terrain-v2'
+			});
+
+			map.addLayer({
+				"id": "terrain-data",
+				"type": "line",
+				"source": "terrain-data",
+				"source-layer": "contour",
+				"layout": {
+					"line-join": "round",
+					"line-cap": "round"
+				},
+				"paint": {
+					"line-color": "#7a9e00",
+					"line-width": 1
+				}
+			});
+
+//			 Load the taxlots from the raw geojson source
+			$.getJSON(deschutesTaxlots).done(function(json){
+				console.log(json);
+
+				map.addSource('taxlotsJson', {
+					"type": 'geojson',
+					"data": json
+				});
+
+				map.addLayer({
+					"id": "taxlots",
+					"type": "fill",
+					"source": "taxlotsJson",
+					"paint": {
+						"fill-color": "rgb(122, 160, 180)",
+						"fill-opacity": 0.5,
+						// "fill-line-width": 1.5,
+						"fill-outline-color": "#fff"
+					},
+					"interactive": true
+				});
+			});
+
+
+			// Load the taxlots from a vector tile service
+//			map.addSource('taxlots', {
+//				type: 'vector',
+//				url: smartmineTaxlots
+//			});
+//
+//			console.log(map.getSource('taxlots'));
+//
+//			map.addLayer({
+//				"id": "taxlots",
+//				"source": "taxlots",
+//				"source-layer": "taxlots_joined",
+//				"type": "fill",
+//				"paint": {
+//					"fill-color": "rgb(122, 160, 180)",
+//					"fill-opacity": 0.5,
+//					"fill-line-width": 1.5,
+//					"fill-outline-color": "#fff"
+//				},
+//				"interactive": true
+//			});
+
+			// When the mouse moves...
+			map.on('click', function (e) {
+
+				// Get features within radius 1 of mousepoint
+        map.featuresAt(e.point, {radius: 1, layer: 'taxlots'}, function (err, features) {
+          if (err) throw err;
+						console.log(features);
+					// Get the taxlot of the feature
+					var taxlotID = features[0].properties.TAXLOT;
+
+					// Write the feature info to the features div
+          var infoBox = document.getElementById('features')
+
+					var newRequest = "";
+
+					newRequest = deschutesSalesQuery + "query?where=Taxlot=%27" + taxlotID + "%27&f=json&outFields=Total_Sales_Price_1,Sales_Date_1,Total_Sales_Price_2,Sales_Date_2";
+
+					// Creating a call to the mapserver API
+					aClient = new HttpClient();
+					aClient.get(newRequest, function(response){
+
+						var data = JSON.parse(response);
+
+						var saleDate1 = new Date(data.features[0].attributes.Sales_Date_1).toLocaleDateString('en-US');
+						var saleDate2 = new Date(data.features[0].attributes.Sales_Date_2).toLocaleDateString('en-US');
+
+						var salesPrice1 = data.features[0].attributes.Total_Sales_Price_1;
+						var salesPrice2 = data.features[0].attributes.Total_Sales_Price_2;
+
+						// Populate the little thing with the info
+						infoBox.innerHTML = "<h3>Taxlot ID: " + taxlotID + "</h3><p>Most recent sale date: " + saleDate1 + "</p><p>Most recent sale price: $" + salesPrice1 + "</p><p>Second most recent sale date: " + saleDate2 + "</p><p>Second most recent sale price: $" + salesPrice2 + "</p>" ;
+					});
+
+        });
+
+    	});
+
+			map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
+
+		});
+	 // End mapbox GL section
+	}
+
+	// Basic GET setup for mapserver API
+	var HttpClient = function() {
+    this.get = function(aUrl, aCallback) {
+        var anHttpRequest = new XMLHttpRequest();
+        anHttpRequest.onreadystatechange = function() {
+            if (anHttpRequest.readyState == 4 && anHttpRequest.status == 200)
+                aCallback(anHttpRequest.responseText);
+        }
+
+        anHttpRequest.open( "GET", aUrl, true );
+        anHttpRequest.send( null );
+    }
+}
+</script>
+
+</body>
+</html>
